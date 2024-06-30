@@ -224,7 +224,7 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
                         SizedBox(
                           width: double.infinity,
                           height: double.infinity,
-                          child: Image.network("http://10.0.2.2/ticketmaster/"+ticketData["image"]
+                          child: Image.network("${AppConstants.imageUrl}"+ticketData["image"]
                             , // Use the image URL from ticketData
                             fit: BoxFit.cover,
                           ),

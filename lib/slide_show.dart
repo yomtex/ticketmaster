@@ -6,6 +6,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ticketmaster/app_constants.dart';
+import 'package:ticketmaster/check_box.dart';
+import 'package:ticketmaster/details.dart';
 import 'package:ticketmaster/inser_screen.dart';
 
 class SlideshowScreen extends StatefulWidget {
@@ -17,10 +19,13 @@ class SlideshowScreen extends StatefulWidget {
 }
 
 class _SlideshowScreenState extends State<SlideshowScreen> {
-  Future<Map<String, dynamic>> fetchTicketByToken(String token) async {
-    // final String apiUrl = 'http://10.0.2.2/ticketmaster/index.php?token=$token'; // Replace with your PHP script URL
-    final String apiUrl = '${AppConstants.baseUrl}?token=$token';
+  late Future<Map<String, dynamic>> _ticketDataFuture;
+  Map<String, dynamic>? _ticketData;
+  bool _isVisible = true;
+  bool _isAddToWalletVisible = true;
 
+  Future<Map<String, dynamic>> fetchTicketByToken(String token) async {
+    final String apiUrl = '${AppConstants.baseUrl}?token=$token';
     var response = await http.get(Uri.parse(apiUrl));
 
     if (response.statusCode == 200) {
@@ -35,9 +40,11 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
       throw Exception('Failed to load ticket');
     }
   }
+
   @override
   void initState() {
-    super.initState(); // Check if token exists in SharedPreferences on app startup
+    super.initState();
+    _ticketDataFuture = fetchTicketByToken(widget.token);
   }
 
   void checkTokenExists() async {
@@ -128,7 +135,7 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
         ),
       ),
       body: FutureBuilder(
-        future: fetchTicketByToken(widget.token),
+        future: _ticketDataFuture,
         builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
@@ -188,10 +195,11 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                         Column(
+                        Column(
                           children: [
                             TextWidget(text: "SEC"),
-                            Text(ticketData["section"].toString(),
+                            Text(
+                              ticketData["section"].toString(),
                               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26),
                             ),
                           ],
@@ -205,7 +213,8 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
                         Column(
                           children: [
                             const TextWidget(text: "SEAT"),
-                            Text(seatNumber.toString(),
+                            Text(
+                              seatNumber.toString(),
                               style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26),
                             ),
                           ],
@@ -213,35 +222,32 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.only(bottom: 600 / 60),
+                  _isVisible
+                      ? Container(
                     color: Colors.grey,
                     width: double.maxFinite,
                     height: 600 / 3,
                     child: Stack(
                       children: [
-                        // Image background
                         SizedBox(
                           width: double.infinity,
                           height: double.infinity,
-                          child: Image.network("${AppConstants.imageUrl}"+ticketData["image"]
-                            , // Use the image URL from ticketData
+                          child: Image.network(
+                            "${AppConstants.imageUrl}" + ticketData["image"],
                             fit: BoxFit.cover,
                           ),
                         ),
-                        // Transparent black overlay
                         Container(
                           width: double.infinity,
-                          height: double.infinity,
-                          color: Colors.black.withOpacity(0.5), // Adjust the opacity as needed
+                          height: 600 / 3,
+                          color: Colors.black.withOpacity(0.5),
                         ),
-                        // Centered text
                         Column(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             Center(
                               child: Text(
-                                ticketData["tourName"], // Display tourName from ticketData
+                                ticketData["tourName"],
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 22,
@@ -251,7 +257,7 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
                             ),
                             Center(
                               child: Text(
-                                ticketData["date"], // Display date from ticketData
+                                ticketData["date"],
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Colors.white,
@@ -260,9 +266,22 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
                                 ),
                               ),
                             ),
+                            SizedBox(height: 15),
                           ],
                         ),
                       ],
+                    ),
+                  )
+                      : SizedBox(
+                    width: double.infinity,
+                    height: 600 / 3,
+                    child: Container(
+                      color: Colors.white,
+                      padding: EdgeInsets.symmetric(horizontal: 15),
+                      child: Image.network(
+                        "${AppConstants.imageUrl}" + "uploads/grcode.jpg",
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   Container(
@@ -273,40 +292,86 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
                           color: Colors.white,
                           width: double.maxFinite,
                           height: 600 / 6,
-                          child: const Center(
+                          child: Center(
                             child: Text(
-                              "LOWER LEVEL",
-                              style: TextStyle(fontWeight: FontWeight.w400),
+                              ticketData["level"].toString(),
+                              style: TextStyle(fontWeight: FontWeight.w500),
                             ),
                           ),
                         ),
-                        Container(
-                          color: Colors.blueAccent,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.qr_code_scanner_outlined, color: Colors.white),
-                              SizedBox(width: 10),
-                              TextWidget(text: "View Barcode"),
-                            ],
-                          ),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isAddToWalletVisible = !_isAddToWalletVisible;
+                            });
+                          },
+                            child:_isAddToWalletVisible?Container(
+                                color: Colors.blueAccent,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                margin: EdgeInsets.symmetric(
+                                    horizontal: MediaQuery.of(context).size.width / 5, vertical: 10),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.wallet, color: Colors.white),
+                                    SizedBox(width: 10),
+                                    TextWidget(text:  "Add to wallet"),
+                                  ],
+                                ),
+                              )
+                                : Container(
+                              color: Colors.blueAccent,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              margin: EdgeInsets.symmetric(
+                                  horizontal: MediaQuery.of(context).size.width / 5, vertical: 10),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.qr_code_scanner_outlined, color: Colors.white),
+                                  SizedBox(width: 10),
+                                  TextWidget(text:  "View in wallet"),
+                                ],
+                              ),
+                            ),
                         ),
-                        const SizedBox(height: 600 / 60),
-                        const Text("Ticket Details"),
+                        const SizedBox(height: 600 / 80),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _isVisible = !_isVisible;
+                                });
+                              },
+                              child: const Text(
+                                "View Barcode",
+                                style: TextStyle(color: Colors.blue),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => DetailScreen(token: widget.token)),
+                                );
+                              },
+                              child: Text("Ticket Details", style: TextStyle(color: Colors.blue)),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 600 / 24),
                       ],
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(7.0),
+                    padding: const EdgeInsets.all(10.0),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Transform(
                           alignment: Alignment.center,
-                          transform: Matrix4.rotationZ(2.5), // Adjust the angle here (in radians)
+                          transform: Matrix4.rotationZ(2.5),
                           child: Icon(
                             CupertinoIcons.ticket_fill,
                             color: Colors.white,
@@ -329,18 +394,32 @@ class _SlideshowScreenState extends State<SlideshowScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(5),
-                  color: Colors.blueAccent,
-                ),
-                child: const TextWidget(
-                  text: "Transfer",
+              GestureDetector(
+                onTap: () {
+                  showModalBottomSheet(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return Container(
+                          padding: EdgeInsets.all(10),
+                          color: Colors.white,
+                          height: 900,
+                          child: CheckboxRowWidget(),
+                        );
+                      });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 30),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(5),
+                    color: Colors.blueAccent,
+                  ),
+                  child: const TextWidget(
+                    text: "Transfer",
+                  ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 25),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(5),
                   color: Colors.grey,
